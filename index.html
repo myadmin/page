@@ -1,0 +1,857 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+    <head>
+        <meta charset="UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <title>本地电子书阅读器</title>
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+        <script src="https://cdn.jsdelivr.net/npm/epubjs/dist/epub.min.js"></script>
+        <style>
+            html,
+            body {
+                margin: 0;
+                padding: 0;
+                height: 100%;
+                overflow: hidden; /* 禁止 body 出现滚动条 */
+            }
+
+            body {
+                font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+                margin: 0;
+                padding: 20px;
+                background-color: #f5f5f5;
+                color: #333;
+            }
+            .container {
+                display: flex;
+                flex-direction: column;
+                height: 100vh; /* 高度为视口高度 */
+                box-sizing: border-box;
+            }
+
+            h1 {
+                text-align: center;
+                color: #2c3e50;
+                margin-bottom: 30px;
+            }
+            .controls {
+                display: flex;
+                flex-wrap: wrap;
+                gap: 10px;
+                margin-bottom: 20px;
+                align-items: center;
+                padding: 15px;
+                background-color: #f0f0f0;
+                border-radius: 5px;
+                flex-shrink: 0;
+            }
+            .control-group {
+                display: flex;
+                align-items: center;
+                gap: 8px;
+            }
+            label {
+                font-weight: bold;
+                margin-right: 5px;
+            }
+            button,
+            select,
+            input[type="file"] {
+                padding: 8px 12px;
+                border: 1px solid #ddd;
+                border-radius: 4px;
+                background-color: white;
+                font-size: 14px;
+            }
+            button {
+                background-color: #3498db;
+                color: white;
+                border: none;
+                cursor: pointer;
+                transition: background-color 0.3s;
+            }
+            button:hover {
+                background-color: #2980b9;
+            }
+            button:disabled {
+                background-color: #95a5a6;
+                cursor: not-allowed;
+            }
+            /* #reader {
+                height: 70vh;
+                border: 1px solid #ddd;
+                padding: 20px;
+                overflow: auto;
+                font-size: 1.1em;
+                line-height: 1.6;
+                background-color: white;
+                border-radius: 5px;
+                margin-top: 10px;
+            } */
+            #reader {
+                flex: 1;
+                overflow: hidden; /* 禁止横向滚动，保留垂直滚动由内部控制 */
+                display: flex;
+                border: 1px solid #ddd;
+                border-radius: 5px;
+                background-color: white;
+                min-width: 0; /* 防止子元素撑宽 */
+            }
+
+            #toc {
+                width: 250px;
+                overflow-y: auto;
+                overflow-x: hidden;
+                box-sizing: border-box;
+                min-width: 0;
+            }
+
+            #toc-list li {
+                padding: 6px 8px;
+                cursor: pointer;
+                user-select: none;
+                font-size: 14px;
+            }
+
+            #toc-list li.active {
+                background-color: #3498db;
+                color: white;
+                font-weight: bold;
+                border-radius: 4px;
+            }
+
+            #epub-viewer {
+                width: 100%;
+                height: 100%;
+                overflow-y: auto;
+                overflow-x: hidden; /* 禁止横向滚动条 */
+                box-sizing: border-box;
+            }
+            #epub-viewer .epub-view {
+                width: 100% !important;
+            }
+
+            .status {
+                margin-top: 10px;
+                margin-bottom: 10px;
+                padding: 10px;
+                border-radius: 4px;
+                display: none;
+            }
+            .status.success {
+                background-color: #d4edda;
+                color: #155724;
+                display: block;
+            }
+            .status.error {
+                background-color: #f8d7da;
+                color: #721c24;
+                display: block;
+            }
+            .settings {
+                flex-shrink: 0;
+                padding: 15px;
+                background-color: #f8f9fa;
+                border-radius: 5px;
+            }
+            .settings h3 {
+                margin: 5px 0;
+            }
+            .settings-row {
+                display: flex;
+                align-items: center;
+                margin-right: 50px;
+            }
+            .settings-row:last-child {
+                margin-right: 0;
+            }
+            .settings-row label {
+                width: auto;
+            }
+            input[type="range"] {
+                width: 200px;
+                margin-right: 10px;
+            }
+            .font-preview {
+                font-size: 1.2em;
+                margin-top: 5px;
+            }
+        </style>
+    </head>
+    <body>
+        <div class="container">
+            <h1>本地电子书阅读器</h1>
+
+            <div class="controls">
+                <div class="control-group">
+                    <label for="bookInput">选择图书:</label>
+                    <input type="file" id="bookInput" accept=".txt,.epub" />
+                </div>
+                <div class="control-group">
+                    <button id="loadFontsBtn">加载系统字体</button>
+                    <select id="fontSelector" disabled>
+                        <option value="">-- 选择字体 --</option>
+                    </select>
+                </div>
+                <div class="control-group">
+                    <button id="resetBtn">重置样式</button>
+                </div>
+            </div>
+
+            <div class="settings">
+                <h3>阅读设置</h3>
+                <div style="display: flex">
+                    <div class="settings-row">
+                        <label for="fontSize">字体大小:</label>
+                        <input
+                            type="range"
+                            id="fontSize"
+                            min="12"
+                            max="32"
+                            value="16"
+                            step="1"
+                        />
+                        <span id="fontSizeValue">16px</span>
+                    </div>
+                    <div class="settings-row">
+                        <label for="lineHeight">行高:</label>
+                        <input
+                            type="range"
+                            id="lineHeight"
+                            min="1"
+                            max="2.5"
+                            value="1.6"
+                            step="0.1"
+                        />
+                        <span id="lineHeightValue">1.6</span>
+                    </div>
+                    <div class="settings-row">
+                        <label for="theme">主题:</label>
+                        <select id="theme">
+                            <option value="light">浅色</option>
+                            <option value="dark">深色</option>
+                            <option value="sepia">护眼</option>
+                        </select>
+                    </div>
+                    <div class="settings-row" style="display: none">
+                        <label>当前字体:</label>
+                        <div id="currentFont" class="font-preview">
+                            未选择字体
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div id="status" class="status"></div>
+
+            <div
+                id="reader"
+                style="
+                    display: flex;
+                    height: 70vh;
+                    border: 1px solid #ddd;
+                    border-radius: 5px;
+                    overflow: hidden;
+                "
+            >
+                <p
+                    style="
+                        text-align: center;
+                        color: #777;
+                        margin-top: 50px;
+                        display: flex;
+                        align-items: center;
+                        flex: 1;
+                        flex-direction: column;
+                    "
+                >
+                    请选择本地图书文件开始阅读<br />支持格式: .txt, .epub
+                </p>
+            </div>
+        </div>
+
+        <script>
+            const bookInput = document.getElementById("bookInput");
+            const loadFontsBtn = document.getElementById("loadFontsBtn");
+            const fontSelector = document.getElementById("fontSelector");
+            const reader = document.getElementById("reader");
+            const statusDiv = document.getElementById("status");
+            const resetBtn = document.getElementById("resetBtn");
+            const fontSizeSlider = document.getElementById("fontSize");
+            const fontSizeValue = document.getElementById("fontSizeValue");
+            const lineHeightSlider = document.getElementById("lineHeight");
+            const lineHeightValue = document.getElementById("lineHeightValue");
+            const themeSelect = document.getElementById("theme");
+            const currentFontDisplay = document.getElementById("currentFont");
+
+            const state = {
+                currentFont: null,
+                fontSize: 16,
+                lineHeight: 1.6,
+                theme: "light",
+                isEpub: false, // 是否当前在阅读 epub
+            };
+
+            let rendition = null;
+            let book = null;
+
+            function init() {
+                bookInput.addEventListener("change", handleFileSelect);
+                loadFontsBtn.addEventListener("click", loadSystemFonts);
+                fontSelector.addEventListener("change", applySelectedFont);
+                resetBtn.addEventListener("click", resetStyles);
+                fontSizeSlider.addEventListener("input", updateFontSize);
+                lineHeightSlider.addEventListener("input", updateLineHeight);
+                themeSelect.addEventListener("change", updateTheme);
+
+                updateFontSize();
+                updateLineHeight();
+                updateTheme();
+            }
+
+            async function handleFileSelect(event) {
+                const file = event.target.files[0];
+                if (!file) return;
+                clearStatus();
+
+                try {
+                    if (file.name.endsWith(".txt")) {
+                        state.isEpub = false;
+                        if (rendition) {
+                            rendition.destroy();
+                            rendition = null;
+                        }
+                        book = null;
+
+                        const text = await file.text();
+                        displayTextContent(text);
+                        showStatus(`成功加载: ${file.name}`, "success");
+                    } else if (file.name.endsWith(".epub")) {
+                        state.isEpub = true;
+                        displayEpubContent(file);
+                        showStatus(`成功加载: ${file.name}`, "success");
+                    } else {
+                        showStatus("不支持的文件格式", "error");
+                    }
+                } catch (error) {
+                    showStatus(`读取失败: ${error.message}`, "error");
+                    console.error("读取错误：", error);
+                }
+            }
+
+            function displayTextContent(text) {
+                reader.innerHTML = `<div class="content">${text
+                    .replace(/\n/g, "<br>")
+                    .replace(/ /g, "&nbsp;")}</div>`;
+                applyCurrentSettings();
+            }
+
+            function displayEpubContent(file) {
+                reader.innerHTML = `
+                    <div id="toc" style="width: 250px; overflow-y: auto; border-right: 1px solid #ddd; padding: 10px; box-sizing: border-box;"></div>
+                    <div id="epub-viewer" style="flex: 1; overflow-x: auto; height: 100%;"></div>
+                `;
+
+                if (rendition) {
+                    rendition.destroy();
+                    rendition = null;
+                }
+                book = ePub();
+
+                const readerInstance = new FileReader();
+
+                readerInstance.onload = async function () {
+                    try {
+                        const arrayBuffer = readerInstance.result;
+                        await book.open(arrayBuffer, "binary");
+
+                        rendition = book.renderTo("epub-viewer", {
+                            width: "100%",
+                            height: "100%",
+                            flow: "scrolled",
+                            spread: "none",
+                        });
+
+                        window.rendition = rendition;
+
+                        const start =
+                            book.navigation?.toc?.[0]?.href || undefined;
+
+                        await rendition.display(start);
+
+                        generateToc(book.navigation.toc);
+
+                        applyEpubTheme();
+
+                        setupKeyboardListener();
+
+                        renderToc(book.navigation.toc || []);
+
+                        // 绑定章节变更事件，动态高亮目录
+                        rendition.on("relocated", (location) => {
+                            const currentHref = location.start.href.replace(
+                                /#.*/,
+                                ""
+                            );
+
+                            const tocItems =
+                                document.querySelectorAll("#toc-list li");
+                            tocItems.forEach((li) => {
+                                const href = li.dataset.href?.replace(
+                                    /#.*/,
+                                    ""
+                                );
+                                if (href === currentHref) {
+                                    li.classList.add("active");
+                                    li.scrollIntoView({
+                                        behavior: "smooth",
+                                        block: "center",
+                                    });
+                                } else {
+                                    li.classList.remove("active");
+                                }
+                            });
+                        });
+
+                        // 清理旧事件，避免多次绑定
+                        document.removeEventListener("keydown", onKeyDown);
+                        document.addEventListener("keydown", onKeyDown);
+
+                        // 添加点击左右区域翻页支持
+                        const epubViewer =
+                            document.getElementById("epub-viewer");
+                        epubViewer.onclick = (e) => {
+                            const rect = epubViewer.getBoundingClientRect();
+                            const clickX = e.clientX - rect.left;
+                            if (clickX < rect.width * 0.3) {
+                                // 左边30%点击 翻上一页
+                                rendition.prev();
+                            } else if (clickX > rect.width * 0.7) {
+                                // 右边30%点击 翻下一页
+                                rendition.next();
+                            }
+                        };
+
+                        showStatus(
+                            "EPUB 加载成功，使用 ← → 键或点击左右翻页",
+                            "success"
+                        );
+                    } catch (error) {
+                        console.error("EPUB 加载失败：", error);
+                        showStatus("EPUB 加载失败：" + error.message, "error");
+                    }
+                };
+
+                readerInstance.readAsArrayBuffer(file);
+            }
+
+            // 生成目录树
+            function generateToc(toc) {
+                const tocDiv = document.getElementById("toc");
+                if (!tocDiv || !toc) return;
+
+                tocDiv.innerHTML = ""; // 清空旧目录
+
+                const ul = document.createElement("ul");
+                ul.id = "toc-list";
+                ul.style.listStyle = "none";
+                ul.style.paddingLeft = "0";
+
+                function addItems(items, parentUl) {
+                    items.forEach((item) => {
+                        const li = document.createElement("li");
+                        li.style.marginBottom = "6px";
+
+                        const a = document.createElement("a");
+                        a.href = "javascript:void(0)";
+                        a.textContent = item.label;
+                        a.style.color = "inherit";
+                        a.style.textDecoration = "none";
+                        a.style.cursor = "pointer";
+
+                        a.onclick = () => {
+                            if (rendition) {
+                                rendition.display(item.href);
+                            }
+                        };
+
+                        li.appendChild(a);
+
+                        if (item.subitems && item.subitems.length > 0) {
+                            const subUl = document.createElement("ul");
+                            subUl.style.listStyle = "none";
+                            subUl.style.paddingLeft = "15px";
+                            addItems(item.subitems, subUl);
+                            li.appendChild(subUl);
+                        }
+
+                        parentUl.appendChild(li);
+                    });
+                }
+
+                addItems(toc, ul);
+                tocDiv.appendChild(ul);
+            }
+
+            function renderToc(toc) {
+                const tocList = document.getElementById("toc-list");
+                tocList.innerHTML = "";
+
+                toc.forEach((item, index) => {
+                    const li = document.createElement("li");
+                    li.textContent =
+                        item.label || item.text || `章节 ${index + 1}`;
+                    // li.dataset.href = item.href;
+                    li.dataset.href = item.href.split("#")[0];
+                    li.style.padding = "6px 8px";
+                    li.style.cursor = "pointer";
+                    li.style.userSelect = "none";
+
+                    li.addEventListener("click", () => {
+                        // 高亮当前点击项
+                        document
+                            .querySelectorAll("#toc-list li")
+                            .forEach((el) => {
+                                el.classList.remove("active");
+                            });
+                        li.classList.add("active");
+
+                        // 跳转章节
+                        if (rendition && item.href) {
+                            rendition.display(item.href);
+                            // 跳转章节时滚动右侧容器到顶部
+                            const epubViewer =
+                                document.getElementById("epub-viewer");
+                            if (epubViewer) epubViewer.scrollTop = 0;
+                        }
+                    });
+
+                    tocList.appendChild(li);
+                });
+            }
+
+            function setupKeyboardListener() {
+                // 给外层绑定
+                document.removeEventListener("keydown", onKeyDown);
+                document.addEventListener("keydown", onKeyDown);
+
+                // 给iframe内部绑定
+                if (!rendition) return;
+                rendition.getContents().forEach((contents) => {
+                    if (contents && contents.document) {
+                        contents.document.removeEventListener(
+                            "keydown",
+                            onKeyDown
+                        );
+                        contents.document.addEventListener(
+                            "keydown",
+                            onKeyDown
+                        );
+                    }
+                });
+
+                // 监听之后，如果后续rendition翻页或章节变了，需要重新绑定iframe内部事件
+                rendition.on("rendered", () => {
+                    rendition.getContents().forEach((contents) => {
+                        if (contents && contents.document) {
+                            contents.document.removeEventListener(
+                                "keydown",
+                                onKeyDown
+                            );
+                            contents.document.addEventListener(
+                                "keydown",
+                                onKeyDown
+                            );
+                            contents.document.documentElement.style.overflowX =
+                                "hidden";
+                            contents.document.body.style.overflowX = "hidden";
+                        }
+                    });
+                    const location = rendition.currentLocation();
+                    if (location) {
+                        rendition.emit("relocated", location);
+                    }
+                });
+            }
+
+            // 键盘翻页事件
+            function onKeyDown(e) {
+                if (!state.isEpub || !rendition) return;
+                if (e.key === "ArrowRight") {
+                    e.preventDefault();
+                    rendition.next();
+                } else if (e.key === "ArrowLeft") {
+                    e.preventDefault();
+                    rendition.prev();
+                }
+            }
+
+            function applyCurrentSettings() {
+                // 统一定义背景色和文字色映射
+                const backgroundColorMap = {
+                    dark: "#222",
+                    sepia: "#f4ecd8",
+                    light: "#fefefe",
+                };
+                const textColorMap = {
+                    dark: "#eee",
+                    sepia: "#5b4636",
+                    light: "#333",
+                };
+
+                const bgColor = backgroundColorMap[state.theme] || "#fff";
+                const txtColor = textColorMap[state.theme] || "#333";
+
+                // 设置整个页面的背景色和文字颜色
+                document.body.style.backgroundColor = bgColor;
+                document.body.style.color = txtColor;
+
+                const container = document.querySelector(".container");
+                if (container) {
+                    container.style.backgroundColor = bgColor;
+                    container.style.color = txtColor;
+                }
+
+                // 根据当前阅读模式分别应用样式
+                if (state.isEpub && rendition && rendition.themes) {
+                    applyEpubTheme();
+                } else {
+                    // 纯文本阅读区域样式
+                    const content = reader.querySelector(".content");
+                    if (content) {
+                        content.style.fontSize = `${state.fontSize}px`;
+                        content.style.lineHeight = state.lineHeight;
+                        if (state.currentFont) {
+                            content.style.fontFamily = `'${state.currentFont}', sans-serif`;
+                        }
+                    }
+                    reader.style.backgroundColor = bgColor;
+                    reader.style.color = txtColor;
+                }
+            }
+
+            function applyEpubTheme() {
+                if (!rendition || !rendition.themes) {
+                    console.warn("rendition 尚未初始化，无法应用主题");
+                    return;
+                }
+
+                const style = {
+                    body: {
+                        "font-size": `${state.fontSize}px`,
+                        "line-height": state.lineHeight,
+                        background:
+                            state.theme === "dark"
+                                ? "#222"
+                                : state.theme === "sepia"
+                                ? "#f4ecd8"
+                                : "white",
+                        color:
+                            state.theme === "dark"
+                                ? "#eee"
+                                : state.theme === "sepia"
+                                ? "#5b4636"
+                                : "#333",
+                        "font-family": state.currentFont
+                            ? `'${state.currentFont}', sans-serif`
+                            : "inherit",
+                    },
+                };
+
+                rendition.themes.register("custom", style);
+                rendition.themes.select("custom");
+                rendition.themes.override("html, body", {
+                    "overflow-x": "hidden",
+                    "box-sizing": "border-box",
+                    "max-width": "100%",
+                });
+
+                rendition.themes.override("body", {
+                    "overflow-x": "hidden",
+                    "max-width": "100%",
+                    "box-sizing": "border-box",
+                });
+
+                rendition.themes.override("img", {
+                    "max-width": "100%",
+                    height: "auto",
+                });
+
+                const backgroundColorMap = {
+                    dark: "#222",
+                    sepia: "#f4ecd8",
+                    light: "#fefefe",
+                };
+                const textColorMap = {
+                    dark: "#eee",
+                    sepia: "#5b4636",
+                    light: "#333",
+                };
+
+                const bgColor = backgroundColorMap[state.theme] || "#fff";
+                const txtColor = textColorMap[state.theme] || "#333";
+
+                // 设置整个页面的背景色和文字颜色
+                document.body.style.backgroundColor = bgColor;
+                document.body.style.color = txtColor;
+
+                const container = document.querySelector(".container");
+                if (container) {
+                    container.style.backgroundColor = bgColor;
+                    container.style.color = txtColor;
+                }
+            }
+
+            async function loadSystemFonts() {
+                clearStatus();
+                loadFontsBtn.disabled = true;
+                loadFontsBtn.textContent = "加载中...";
+                try {
+                    if (!("queryLocalFonts" in window))
+                        throw new Error("浏览器不支持本地字体访问");
+                    const fonts = await window.queryLocalFonts();
+                    const seen = new Set(),
+                        fontList = [];
+                    fonts.forEach((f) => {
+                        const name = f.fullName || f.postscriptName;
+                        if (name && !seen.has(name)) {
+                            seen.add(name);
+                            fontList.push({ name, value: f.postscriptName });
+                        }
+                    });
+                    fontList.sort((a, b) => a.name.localeCompare(b.name));
+                    fontSelector.innerHTML =
+                        '<option value="">-- 选择字体 --</option>';
+                    fontList.forEach((f) => {
+                        const opt = document.createElement("option");
+                        opt.value = f.value;
+                        opt.textContent = f.name;
+                        fontSelector.appendChild(opt);
+                    });
+                    fontSelector.disabled = false;
+                    showStatus(`已加载 ${fontList.length} 种字体`, "success");
+                } catch (e) {
+                    console.error(e);
+                    showStatus("字体加载失败，将提供默认字体选项", "error");
+                    [
+                        "Arial",
+                        "Verdana",
+                        "Times New Roman",
+                        "Courier New",
+                        "宋体",
+                        "微软雅黑",
+                    ].forEach((f) => {
+                        const opt = document.createElement("option");
+                        opt.value = f;
+                        opt.textContent = f;
+                        fontSelector.appendChild(opt);
+                    });
+                    fontSelector.disabled = false;
+                } finally {
+                    loadFontsBtn.disabled = false;
+                    loadFontsBtn.textContent = "加载系统字体";
+                }
+            }
+
+            function applySelectedFont(e) {
+                const font = e.target.value;
+                if (!font) return;
+                state.currentFont = font;
+
+                const style = document.getElementById("customFontStyle");
+                if (style) style.remove();
+
+                const newStyle = document.createElement("style");
+                newStyle.id = "customFontStyle";
+                newStyle.textContent = `
+                    @font-face { font-family: '${font}'; src: local('${font}'); }
+                    #reader .content { font-family: '${font}', sans-serif; }
+                `;
+                document.head.appendChild(newStyle);
+
+                currentFontDisplay.textContent = font;
+                currentFontDisplay.style.fontFamily = `'${font}'`;
+
+                applyCurrentSettings();
+                showStatus(`已应用字体: ${font}`, "success");
+            }
+
+            function updateFontSize() {
+                state.fontSize = fontSizeSlider.value;
+                fontSizeValue.textContent = `${state.fontSize}px`;
+                applyCurrentSettings();
+            }
+
+            function updateLineHeight() {
+                state.lineHeight = lineHeightSlider.value;
+                lineHeightValue.textContent = state.lineHeight;
+                applyCurrentSettings();
+            }
+
+            function updateTheme() {
+                state.theme = themeSelect.value;
+                applyCurrentSettings();
+            }
+
+            function applyCurrentSettings() {
+                if (state.isEpub && rendition && rendition.themes) {
+                    applyEpubTheme();
+                } else {
+                    // 纯文本调整样式
+                    const content = reader.querySelector(".content");
+                    if (content) {
+                        content.style.fontSize = `${state.fontSize}px`;
+                        content.style.lineHeight = state.lineHeight;
+                        if (state.currentFont) {
+                            content.style.fontFamily = `'${state.currentFont}', sans-serif`;
+                        }
+                        switch (state.theme) {
+                            case "dark":
+                                reader.style.backgroundColor = "#222";
+                                reader.style.color = "#eee";
+                                break;
+                            case "sepia":
+                                reader.style.backgroundColor = "#f4ecd8";
+                                reader.style.color = "#5b4636";
+                                break;
+                            default:
+                                reader.style.backgroundColor = "white";
+                                reader.style.color = "#333";
+                        }
+                    }
+                }
+            }
+
+            function resetStyles() {
+                state.currentFont = null;
+                fontSelector.value = "";
+                const oldStyle = document.getElementById("customFontStyle");
+                if (oldStyle) oldStyle.remove();
+                currentFontDisplay.textContent = "未选择字体";
+                currentFontDisplay.style.fontFamily = "";
+                state.fontSize = 16;
+                state.lineHeight = 1.6;
+                fontSizeSlider.value = 16;
+                lineHeightSlider.value = 1.6;
+                fontSizeValue.textContent = "16px";
+                lineHeightValue.textContent = "1.6";
+                state.theme = "light";
+                themeSelect.value = "light";
+                applyCurrentSettings();
+                showStatus("已重置所有样式", "success");
+            }
+
+            function showStatus(msg, type) {
+                statusDiv.textContent = msg;
+                statusDiv.className = "status " + type;
+            }
+
+            function clearStatus() {
+                statusDiv.textContent = "";
+                statusDiv.className = "status";
+            }
+
+            init();
+        </script>
+    </body>
+</html>
