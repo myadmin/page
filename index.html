@@ -169,11 +169,22 @@
                 font-size: 1.2em;
                 margin-top: 5px;
             }
+            #speechControls {
+                margin-top: 10px;
+                padding: 10px;
+                background-color: #fafafa;
+                border: 1px solid #ddd;
+                border-radius: 5px;
+            }
+            .highlight {
+                background-color: yellow !important;
+                color: black !important;
+            }
         </style>
     </head>
     <body>
         <div class="container">
-            <h1 style="display: none;">本地电子书阅读器</h1>
+            <h1 style="display: none">本地电子书阅读器</h1>
 
             <div class="controls">
                 <div class="control-group">
@@ -188,6 +199,34 @@
                 </div>
                 <div class="control-group">
                     <button id="resetBtn">重置样式</button>
+                </div>
+            </div>
+
+            <div class="controls" id="speechControls">
+                <div class="control-group">
+                    <button id="readBtn">🔊 开始朗读</button>
+                    <button id="pauseBtn">⏸ 暂停</button>
+                    <button id="resumeBtn">▶️ 继续</button>
+                    <button id="stopBtn">⏹ 停止</button>
+                </div>
+                <div class="control-group">
+                    <label for="voiceSelect">语音:</label>
+                    <select id="voiceSelect"></select>
+                </div>
+                <div class="control-group">
+                    <label for="rateRange">语速:</label>
+                    <input
+                        type="range"
+                        id="rateRange"
+                        min="0.5"
+                        max="2"
+                        step="0.1"
+                        value="1"
+                    />
+                </div>
+                <div class="control-group">
+                    <label for="autoNextChapter">自动朗读下一章:</label>
+                    <input type="checkbox" id="autoNextChapter" checked />
                 </div>
             </div>
 
@@ -283,10 +322,19 @@
                 lineHeight: 1.6,
                 theme: "light",
                 isEpub: false, // 是否当前在阅读 epub
+                isSpeaking: false, // 是否正在朗读
+                currentSentence: null, // 当前朗读的句子
+                autoNextChapter: true, // 自动朗读下一章
             };
 
             let rendition = null;
             let book = null;
+            // 确保使用全局的 speechSynthesis 对象
+            const mySpeechSynthesis = window.speechSynthesis;
+            let speechUtterance = null;
+            let currentChapterText = ""; // 当前章节文本
+            let sentences = []; // 分割后的句子数组
+            let currentSentenceIndex = 0; // 当前朗读的句子索引
 
             function init() {
                 bookInput.addEventListener("change", handleFileSelect);
@@ -296,6 +344,38 @@
                 fontSizeSlider.addEventListener("input", updateFontSize);
                 lineHeightSlider.addEventListener("input", updateLineHeight);
                 themeSelect.addEventListener("change", updateTheme);
+
+                // 检查语音合成API是否可用
+                if ('speechSynthesis' in window) {
+                    console.log("语音合成API可用");
+                    // 初始化语音合成相关事件
+                    initSpeechSynthesis();
+                    
+                    // 绑定朗读按钮事件
+                    document.getElementById("readBtn").addEventListener("click", function() {
+                        console.log("开始朗读按钮被点击");
+                        startReading();
+                    });
+                    document.getElementById("pauseBtn").addEventListener("click", pauseReading);
+                    document.getElementById("resumeBtn").addEventListener("click", resumeReading);
+                    document.getElementById("stopBtn").addEventListener("click", stopReading);
+                    
+                    // 语速调整
+                    document.getElementById("rateRange").addEventListener("input", updateSpeechRate);
+                } else {
+                    console.error("语音合成API不可用");
+                    showStatus("您的浏览器不支持语音合成功能", "error");
+                    // 禁用朗读按钮
+                    document.getElementById("readBtn").disabled = true;
+                    document.getElementById("pauseBtn").disabled = true;
+                    document.getElementById("resumeBtn").disabled = true;
+                    document.getElementById("stopBtn").disabled = true;
+                }
+                
+                // 自动朗读下一章控制
+                document.getElementById("autoNextChapter").addEventListener("change", function(e) {
+                    state.autoNextChapter = e.target.checked;
+                });
 
                 updateFontSize();
                 updateLineHeight();
@@ -333,10 +413,45 @@
             }
 
             function displayTextContent(text) {
-                reader.innerHTML = `<div class="content">${text
-                    .replace(/\n/g, "<br>")
-                    .replace(/ /g, "&nbsp;")}</div>`;
-                applyCurrentSettings();
+                console.log("显示文本内容，文本长度:", text.length);
+                
+                // 将文本分割成句子，用于朗读和高亮
+                currentChapterText = text;
+                sentences = splitTextIntoSentences(text);
+                currentSentenceIndex = 0;
+                
+                console.log("准备渲染句子到HTML，句子数量:", sentences.length);
+                
+                // 为每个句子添加span标签，以便高亮
+                let htmlContent = "";
+                try {
+                    sentences.forEach((sentence, index) => {
+                        // 安全处理HTML特殊字符
+                        const safeText = sentence
+                            .replace(/&/g, "&amp;")
+                            .replace(/</g, "&lt;")
+                            .replace(/>/g, "&gt;")
+                            .replace(/"/g, "&quot;")
+                            .replace(/'/g, "&#039;")
+                            .replace(/\n/g, "<br>")
+                            .replace(/ /g, "&nbsp;");
+                            
+                        htmlContent += `<span class="sentence" data-index="${index}">${safeText}</span>`;
+                    });
+                    
+                    reader.innerHTML = `<div class="content">${htmlContent}</div>`;
+                    console.log("文本内容渲染完成");
+                    
+                    // 检查是否成功创建了句子元素
+                    const sentenceElements = document.querySelectorAll(".sentence");
+                    console.log("创建的句子元素数量:", sentenceElements.length);
+                    
+                    applyCurrentSettings();
+                } catch (error) {
+                    console.error("渲染文本内容时出错:", error);
+                    reader.innerHTML = `<div class="content"><p>渲染文本时出错: ${error.message}</p></div>`;
+                    showStatus("渲染文本时出错: " + error.message, "error");
+                }
             }
 
             function displayEpubContent(file) {
@@ -363,7 +478,7 @@
                             height: "100%",
                             flow: "scrolled",
                             spread: "none",
-                            allowScriptedContent: true
+                            allowScriptedContent: true,
                         });
 
                         window.rendition = rendition;
@@ -546,25 +661,41 @@
 
                 // 监听之后，如果后续rendition翻页或章节变了，需要重新绑定iframe内部事件
                 rendition.on("rendered", () => {
-                    rendition.getContents().forEach((contents) => {
-                        if (contents && contents.document) {
-                            contents.document.removeEventListener(
-                                "keydown",
-                                onKeyDown
-                            );
-                            contents.document.addEventListener(
-                                "keydown",
-                                onKeyDown
-                            );
-                            contents.document.documentElement.style.overflowX =
-                                "hidden";
-                            contents.document.body.style.overflowX = "hidden";
-                        }
-                    });
-                    const location = rendition.currentLocation();
-                    if (location) {
-                        rendition.emit("relocated", location);
-                    }
+                            console.log("EPUB内容已渲染，应用自定义样式和事件监听");
+                            rendition.getContents().forEach((contents) => {
+                                if (contents && contents.document) {
+                                    // 添加键盘事件监听
+                                    contents.document.removeEventListener(
+                                        "keydown",
+                                        onKeyDown
+                                    );
+                                    contents.document.addEventListener(
+                                        "keydown",
+                                        onKeyDown
+                                    );
+                                    
+                                    // 设置样式
+                                    contents.document.documentElement.style.overflowX = "hidden";
+                                    contents.document.body.style.overflowX = "hidden";
+                                    
+                                    // 添加自定义样式表
+                                    const styleElement = contents.document.createElement('style');
+                                    styleElement.textContent = `
+                                        .highlight, .sentence.highlight {
+                                            background-color: yellow !important;
+                                            color: black !important;
+                                        }
+                                    `;
+                                    contents.document.head.appendChild(styleElement);
+                                    
+                                    console.log("已向EPUB内容添加自定义样式表");
+                                }
+                            });
+                            
+                            const location = rendition.currentLocation();
+                            if (location) {
+                                rendition.emit("relocated", location);
+                            }
                 });
             }
 
@@ -577,6 +708,18 @@
                 } else if (e.key === "ArrowLeft") {
                     e.preventDefault();
                     rendition.prev();
+                } else if (e.key === "Space") {
+                    // 空格键控制朗读暂停/继续
+                    e.preventDefault();
+                    if (state.isSpeaking) {
+                        if (mySpeechSynthesis.paused) {
+                            resumeReading();
+                        } else {
+                            pauseReading();
+                        }
+                    } else {
+                        startReading();
+                    }
                 }
             }
 
@@ -669,6 +812,11 @@
                 rendition.themes.override("img", {
                     "max-width": "100%",
                     height: "auto",
+                });
+
+                rendition.themes.override(".highlight", {
+                    'background-color': 'yellow !important',
+                    'color': 'black !important'
                 });
 
                 const backgroundColorMap = {
@@ -843,6 +991,400 @@
             function clearStatus() {
                 statusDiv.textContent = "";
                 statusDiv.className = "status";
+            }
+            
+            // 初始化语音合成
+            function initSpeechSynthesis() {
+                if (!('speechSynthesis' in window)) {
+                    showStatus("您的浏览器不支持语音合成功能", "error");
+                    return;
+                }
+                
+                // 获取可用的语音
+                const voiceSelect = document.getElementById("voiceSelect");
+                voiceSelect.innerHTML = "";
+                
+                // 加载语音列表
+                function loadVoices() {
+                    const voices = mySpeechSynthesis.getVoices();
+                    if (voices.length === 0) {
+                        setTimeout(loadVoices, 100);
+                        return;
+                    }
+                    
+                    // 按语言排序
+                    voices.sort((a, b) => {
+                        return a.lang.localeCompare(b.lang);
+                    });
+                    
+                    // 添加到下拉列表
+                    voices.forEach(voice => {
+                        const option = document.createElement("option");
+                        option.value = voice.name;
+                        option.textContent = `${voice.name} (${voice.lang})`;
+                        // 默认选择中文语音
+                        if (voice.lang.includes("zh") || voice.lang.includes("cmn")) {
+                            option.selected = true;
+                        }
+                        voiceSelect.appendChild(option);
+                    });
+                }
+                
+                // Chrome需要等待voiceschanged事件
+                mySpeechSynthesis.addEventListener("voiceschanged", loadVoices);
+                loadVoices(); // 初始加载
+            }
+            
+            // 将文本分割成句子
+            function splitTextIntoSentences(text) {
+                console.log("分割文本成句子，文本长度:", text.length);
+                
+                if (!text || text.trim().length === 0) {
+                    console.error("文本为空，无法分割");
+                    return ["无可朗读内容"];
+                }
+                
+                try {
+                    // 使用正则表达式分割句子，考虑中英文标点
+                    const sentenceRegex = /([.!?。！？…]+\s*)/g;
+                    const sentences = text.split(sentenceRegex).filter(s => s.trim().length > 0);
+                    
+                    console.log("初步分割后的片段数量:", sentences.length);
+                    
+                    // 合并句子和标点
+                    const result = [];
+                    for (let i = 0; i < sentences.length; i += 2) {
+                        let sentence = sentences[i];
+                        if (i + 1 < sentences.length) {
+                            sentence += sentences[i + 1];
+                        }
+                        result.push(sentence);
+                    }
+                    
+                    console.log("最终句子数量:", result.length);
+                    
+                    // 如果没有成功分割，则将整个文本作为一个句子
+                    if (result.length === 0) {
+                        console.warn("未能分割出句子，将整个文本作为一个句子");
+                        return [text];
+                    }
+                    
+                    return result;
+                } catch (error) {
+                    console.error("分割句子时出错:", error);
+                    return [text]; // 出错时返回原文本作为一个句子
+                }
+            }
+            
+            // 开始朗读
+            function startReading() {
+                console.log("开始朗读函数被调用");
+                
+                // 检查语音合成API是否可用
+                if (!('speechSynthesis' in window)) {
+                    console.error("语音合成API不可用");
+                    showStatus("您的浏览器不支持语音合成功能", "error");
+                    return;
+                }
+                
+                if (state.isSpeaking) {
+                    stopReading();
+                } else {
+                    // 如果不是从朗读状态重新开始，则需要手动清除所有高亮
+                    removeAllHighlights();
+                }
+                
+                // 设置朗读状态
+                state.isSpeaking = true;
+                currentSentenceIndex = 0;
+                
+                if (state.isEpub) {
+                    console.log("开始朗读EPUB内容");
+                    startEpubReading();
+                } else {
+                    console.log("开始朗读纯文本内容");
+                    startTextReading();
+                }
+            }
+            
+            // 朗读纯文本内容
+            function startTextReading() {
+                console.log("开始朗读纯文本内容函数被调用");
+                console.log("句子数量:", sentences.length);
+                
+                if (sentences.length === 0) {
+                    console.error("没有可朗读的句子");
+                    showStatus("没有可朗读的内容", "error");
+                    return;
+                }
+                
+                state.isSpeaking = true;
+                currentSentenceIndex = 0;
+                console.log("开始朗读第一个句子");
+                readCurrentSentence();
+            }
+            
+            // 朗读EPUB内容
+            function startEpubReading() {
+                console.log("开始朗读EPUB内容函数被调用");
+                
+                if (!rendition) {
+                    console.error("EPUB渲染器未初始化");
+                    showStatus("EPUB渲染器未初始化", "error");
+                    return;
+                }
+                
+                // 获取当前页面内容
+                const contents = rendition.getContents();
+                if (!contents || contents.length === 0) {
+                    console.error("无法获取EPUB内容");
+                    showStatus("无法获取EPUB内容", "error");
+                    return;
+                }
+                
+                const doc = contents[0].document;
+                if (!doc) {
+                    console.error("无法获取EPUB文档");
+                    showStatus("无法获取EPUB文档", "error");
+                    return;
+                }
+                
+                // 获取当前页面文本
+                const text = doc.body.textContent;
+                console.log("获取到EPUB文本长度:", text.length);
+                currentChapterText = text;
+                sentences = splitTextIntoSentences(text);
+                console.log("EPUB句子数量:", sentences.length);
+                currentSentenceIndex = 0;
+                
+                // 为当前页面的文本节点添加标记，以便高亮
+                markTextNodesInEpub(doc);
+                
+                state.isSpeaking = true;
+                console.log("开始朗读EPUB第一个句子");
+                readCurrentSentence();
+            }
+            
+            // 标记EPUB中的文本节点
+            function markTextNodesInEpub(doc) {
+                // 递归遍历所有文本节点
+                function walkTextNodes(node, sentences, index) {
+                    if (node.nodeType === 3 && node.textContent.trim().length > 0) {
+                        // 创建一个span元素包裹文本节点
+                        const span = doc.createElement("span");
+                        span.className = "sentence";
+                        span.dataset.index = index;
+                        // 确保span元素可以被正确识别和样式化
+                        span.setAttribute("data-sentence", "true");
+                        node.parentNode.replaceChild(span, node);
+                        span.appendChild(node);
+                        return index + 1;
+                    } else if (node.nodeType === 1) {
+                        // 元素节点，递归处理子节点
+                        let currentIndex = index;
+                        const childNodes = Array.from(node.childNodes);
+                        for (const child of childNodes) {
+                            currentIndex = walkTextNodes(child, sentences, currentIndex);
+                        }
+                        return currentIndex;
+                    }
+                    return index;
+                }
+                
+                walkTextNodes(doc.body, sentences, 0);
+            }
+            
+            // 朗读当前句子
+            function readCurrentSentence() {
+                if (currentSentenceIndex >= sentences.length) {
+                    // 当前章节朗读完毕
+                    if (state.autoNextChapter && state.isEpub) {
+                        // 自动朗读下一章
+                        setTimeout(() => {
+                            rendition.next().then(() => {
+                                // 等待页面加载完成
+                                setTimeout(() => {
+                                    startEpubReading();
+                                }, 500);
+                            }).catch(() => {
+                                // 已经是最后一章
+                                stopReading();
+                                showStatus("朗读完成", "success");
+                            });
+                        }, 1000);
+                    } else {
+                        stopReading();
+                        showStatus("朗读完成", "success");
+                    }
+                    return;
+                }
+                
+                const sentence = sentences[currentSentenceIndex];
+                state.currentSentence = sentence;
+                
+                // 高亮当前句子
+                highlightCurrentSentence();
+                
+                // 创建语音合成实例
+                speechUtterance = new SpeechSynthesisUtterance(sentence);
+                
+                // 设置语音
+                const voiceSelect = document.getElementById("voiceSelect");
+                const voices = mySpeechSynthesis.getVoices();
+                const selectedVoice = voices.find(voice => voice.name === voiceSelect.value);
+                if (selectedVoice) {
+                    speechUtterance.voice = selectedVoice;
+                }
+                
+                // 设置语速
+                const rateRange = document.getElementById("rateRange");
+                speechUtterance.rate = parseFloat(rateRange.value);
+                
+                // 句子结束事件
+                speechUtterance.onend = function() {
+                    // 移除当前句子的高亮
+                    if (state.isEpub) {
+                        const contents = rendition.getContents();
+                        if (contents && contents.length > 0) {
+                            const doc = contents[0].document;
+                            if (doc) {
+                                const currentElements = doc.querySelectorAll(`.sentence[data-index="${currentSentenceIndex}"]`);
+                                currentElements.forEach(el => {
+                                    el.classList.remove("highlight");
+                                    el.style.backgroundColor = "";
+                                    el.style.color = "";
+                                });
+                            }
+                        }
+                    } else {
+                        const currentElement = document.querySelector(`.sentence[data-index="${currentSentenceIndex}"]`);
+                        if (currentElement) {
+                            currentElement.classList.remove("highlight");
+                            currentElement.style.backgroundColor = "";
+                            currentElement.style.color = "";
+                        }
+                    }
+                    
+                    // 移动到下一个句子
+                    currentSentenceIndex++;
+                    readCurrentSentence();
+                };
+                
+                // 开始朗读
+                mySpeechSynthesis.speak(speechUtterance);
+            }
+            
+            // 高亮当前句子
+            function highlightCurrentSentence() {
+                // 不再移除所有高亮，只在句子结束时移除当前句子的高亮
+                // 这样可以提高效率，特别是在有大量句子的情况下
+                
+                if (state.isEpub) {
+                    // EPUB模式下高亮
+                    const contents = rendition.getContents();
+                    if (!contents || contents.length === 0) return;
+                    
+                    const doc = contents[0].document;
+                    if (!doc) return;
+                    
+                    const sentenceElements = doc.querySelectorAll(`.sentence[data-index="${currentSentenceIndex}"]`);
+                    console.log(`EPUB高亮: 找到 ${sentenceElements.length} 个句子元素`);
+                    
+                    sentenceElements.forEach(el => {
+                        // 添加类和内联样式双重保障
+                        el.classList.add("highlight");
+                        el.style.backgroundColor = "yellow";
+                        el.style.color = "black";
+                        // 滚动到可视区域
+                        el.scrollIntoView({ behavior: "smooth", block: "center" });
+                    });
+                } else {
+                    // 纯文本模式下高亮
+                    const sentenceElement = document.querySelector(`.sentence[data-index="${currentSentenceIndex}"]`);
+                    if (sentenceElement) {
+                        // 添加类和内联样式双重保障
+                        sentenceElement.classList.add("highlight");
+                        sentenceElement.style.backgroundColor = "yellow";
+                        sentenceElement.style.color = "black";
+                        // 滚动到可视区域
+                        sentenceElement.scrollIntoView({ behavior: "smooth", block: "center" });
+                    }
+                }
+            }
+            
+            // 暂停朗读
+            function pauseReading() {
+                if (state.isSpeaking) {
+                    mySpeechSynthesis.pause();
+                    showStatus("朗读已暂停", "success");
+                }
+            }
+            
+            // 继续朗读
+            function resumeReading() {
+                if (state.isSpeaking && mySpeechSynthesis.paused) {
+                    mySpeechSynthesis.resume();
+                    showStatus("继续朗读", "success");
+                }
+            }
+            
+            // 停止朗读
+            function stopReading() {
+                mySpeechSynthesis.cancel();
+                state.isSpeaking = false;
+                state.currentSentence = null;
+                
+                // 移除所有高亮
+                removeAllHighlights();
+                
+                showStatus("朗读已停止", "success");
+            }
+            
+            // 移除所有高亮的辅助函数
+            function removeAllHighlights() {
+                // 移除纯文本模式下的所有高亮
+                const allSentences = document.querySelectorAll(".sentence");
+                allSentences.forEach(el => {
+                    el.classList.remove("highlight");
+                    // 移除内联样式
+                    el.style.backgroundColor = "";
+                    el.style.color = "";
+                });
+                
+                // 移除EPUB模式下的所有高亮
+                if (state.isEpub && rendition) {
+                    const contents = rendition.getContents();
+                    if (contents && contents.length > 0) {
+                        const doc = contents[0].document;
+                        if (doc) {
+                            const epubSentences = doc.querySelectorAll(".sentence");
+                            epubSentences.forEach(el => {
+                                el.classList.remove("highlight");
+                                el.style.backgroundColor = "";
+                                el.style.color = "";
+                            });
+                        }
+                    }
+                }
+            }
+            
+            // 更新语速
+            function updateSpeechRate() {
+                const rateRange = document.getElementById("rateRange");
+                const rate = parseFloat(rateRange.value);
+                
+                if (speechUtterance) {
+                    speechUtterance.rate = rate;
+                }
+                
+                // 如果正在朗读，需要重新应用
+                if (state.isSpeaking && !mySpeechSynthesis.paused) {
+                    const currentIndex = currentSentenceIndex;
+                    stopReading();
+                    currentSentenceIndex = currentIndex;
+                    state.isSpeaking = true;
+                    readCurrentSentence();
+                }
             }
 
             init();
