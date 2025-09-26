@@ -342,7 +342,11 @@
                             currentUtterance = null;
                             currentIndex = null;
                             playPauseBtn.textContent = "▶️"; // 恢复成播放按钮
-                            exitBtn.click();
+
+                            // 播放到最后一行了，直接执行退出逻辑
+                            speechSynthesis.cancel();
+                            audios.forEach(a => a.classList.remove("active"));
+                            playerControl.style.display = "none";
                         }
                     }
                 };
