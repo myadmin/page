@@ -332,9 +332,17 @@
                 if (selectedVoice) utterance.voice = selectedVoice;
 
                 utterance.onend = () => {
+                    audios[index].classList.remove("active");
+
                     if (!isPaused) {
-                        audios[index].classList.remove("active");
-                        playParagraph(index + 1);
+                        if (index + 1 < paragraphs.length) {
+                            playParagraph(index + 1);
+                        } else {
+                            // 播放到最后一行了
+                            currentUtterance = null;
+                            currentIndex = null;
+                            playPauseBtn.textContent = "▶️"; // 恢复成播放按钮
+                        }
                     }
                 };
 
