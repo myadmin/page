@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Document</title>
+    <title>TTS Demo</title>
     <style>
         * {
             margin: 0;
@@ -18,26 +18,31 @@
 
         .box {
             position: relative;
-            width: 800px;
+            width: 90%;
+            /* 改为百分比宽度 */
+            max-width: 800px;
+            /* 保证大屏上不超过800px */
             margin: 0 auto;
-            padding: 20px;
+            padding: 16px;
             border-left: 1px solid #ccc;
             border-right: 1px solid #ccc;
         }
 
         .box p {
-            font-size: 16px;
+            font-size: 1rem;
+            /* 以 rem 为单位 */
             line-height: 1.5;
-            margin-bottom: 30px;
+            margin-bottom: 24px;
             text-indent: 2em;
         }
 
+        /* audio 按钮保持不变 */
         .audio {
             position: absolute;
             top: 0;
             left: 0;
-            width: 30px;
-            height: 30px;
+            width: 28px;
+            height: 28px;
             border-radius: 50%;
             border: 1px solid #f2f2f2;
             background-color: #f2f2f2;
@@ -55,12 +60,16 @@
             border-color: #388e3c;
         }
 
-        /* 播放面板样式 */
+        /* 播放面板 */
         .player-control {
             position: fixed;
-            top: 20px;
-            left: 20px;
-            width: 300px;
+            bottom: 10px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 90%;
+            /* 在小屏幕下自动适配 */
+            max-width: 340px;
+            /* 大屏时最多340px */
             background: #fff;
             border: 1px solid #ddd;
             border-radius: 12px;
@@ -71,28 +80,36 @@
             display: none;
         }
 
+        /* 标题栏 */
         .player-header {
             display: flex;
             justify-content: space-between;
             align-items: center;
             font-weight: bold;
+            font-size: 15px;
             margin-bottom: 8px;
         }
 
+        /* 按钮布局 */
         .player-buttons {
             display: flex;
-            justify-content: space-between;
+            justify-content: space-around;
+            flex-wrap: wrap;
+            /* 小屏幕自动换行 */
             margin: 10px 0;
+            gap: 8px;
         }
 
         .player-buttons button {
             flex: 1;
-            margin: 0 4px;
-            padding: 6px 10px;
+            min-width: 80px;
+            /* 保证按钮不太窄 */
+            padding: 10px 0;
             border: none;
-            border-radius: 6px;
+            border-radius: 8px;
             cursor: pointer;
             background: #f0f0f0;
+            font-size: 16px;
             transition: background 0.2s;
         }
 
@@ -100,6 +117,7 @@
             background: #e0e0e0;
         }
 
+        /* 参数选项 */
         .player-options {
             margin-top: 10px;
         }
@@ -112,12 +130,54 @@
         .player-options select,
         .player-options input {
             width: 100%;
-            padding: 4px;
-            margin: 4px 0;
+            padding: 6px;
+            margin: 6px 0;
             border-radius: 6px;
             border: 1px solid #ccc;
+            font-size: 14px;
+        }
+
+        /* 📱 移动端优化 */
+        @media (max-width: 480px) {
+            .box p {
+                font-size: 14px;
+                /* 手机字体稍微缩小 */
+            }
+
+            .player-buttons button {
+                min-width: 60px;
+                font-size: 14px;
+                padding: 8px 0;
+            }
         }
     </style>
+    <script>
+        (function () {
+            function setRemUnit() {
+                const docEl = document.documentElement;
+                const width = docEl.clientWidth;
+                const baseWidth = 375; // 设计稿宽度
+                const baseFontSize = 16; // 基准字体
+
+                // 计算缩放后的 font-size
+                let rem = (width / baseWidth) * baseFontSize;
+
+                // 限制最大值（避免 PC 屏幕太大）
+                if (rem > baseFontSize) {
+                    rem = baseFontSize;
+                }
+
+                docEl.style.fontSize = rem + 'px';
+            }
+
+            setRemUnit();
+            window.addEventListener('resize', setRemUnit);
+            window.addEventListener('pageshow', function (e) {
+                if (e.persisted) setRemUnit();
+            });
+        })();
+    </script>
+
 </head>
 
 <body>
