@@ -1,0 +1,348 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Document</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+        }
+
+        .wrapper {
+            width: 100%;
+            height: 100%;
+        }
+
+        .box {
+            position: relative;
+            width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            border-left: 1px solid #ccc;
+            border-right: 1px solid #ccc;
+        }
+
+        .box p {
+            font-size: 16px;
+            line-height: 1.5;
+            margin-bottom: 30px;
+            text-indent: 2em;
+        }
+
+        .audio {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 30px;
+            height: 30px;
+            border-radius: 50%;
+            border: 1px solid #f2f2f2;
+            background-color: #f2f2f2;
+            z-index: 2;
+            cursor: pointer;
+        }
+
+        .audio:hover {
+            background-color: #e0e0e0;
+            border-color: #bdbdbd;
+        }
+
+        .audio.active {
+            background-color: #4caf50;
+            border-color: #388e3c;
+        }
+
+        /* 播放面板样式 */
+        .player-control {
+            position: fixed;
+            top: 20px;
+            left: 20px;
+            width: 300px;
+            background: #fff;
+            border: 1px solid #ddd;
+            border-radius: 12px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+            padding: 12px;
+            z-index: 999;
+            font-family: sans-serif;
+            display: none;
+        }
+
+        .player-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-weight: bold;
+            margin-bottom: 8px;
+        }
+
+        .player-buttons {
+            display: flex;
+            justify-content: space-between;
+            margin: 10px 0;
+        }
+
+        .player-buttons button {
+            flex: 1;
+            margin: 0 4px;
+            padding: 6px 10px;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            background: #f0f0f0;
+            transition: background 0.2s;
+        }
+
+        .player-buttons button:hover {
+            background: #e0e0e0;
+        }
+
+        .player-options {
+            margin-top: 10px;
+        }
+
+        .player-options label {
+            font-size: 14px;
+            margin-right: 6px;
+        }
+
+        .player-options select,
+        .player-options input {
+            width: 100%;
+            padding: 4px;
+            margin: 4px 0;
+            border-radius: 6px;
+            border: 1px solid #ccc;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="wrapper">
+        <div class="box">
+            <p>
+                无纸化学习，正成为大学校园里的常态。用一台平板取代厚重的书本和讲义，上课时直接在课件上圈画重点，所有科目笔记都能轻松整理、一键搜索——这种轻便高效的学习方式，越来越受到学生们的青睐。说到这，许多人第一时间想到的，便是“iPad
+                + Apple Pencil”这套“毕业级”装备。不可否认，iPad
+                体验确实出色，但高昂的价格也成为迈向无纸化学习道路上的第一道门槛。
+            </p>
+            <p>
+                Note: Docker is optional, but it's essential for running the local
+                database and Redis services. If you're planning to run the frontend or
+                want to contribute to frontend features, you can skip the Docker
+                setup. If you have followed the steps below in Setup, you're all set
+                to go!
+            </p>
+            <p>
+                We welcome contributions! While we're actively developing and
+                refactoring certain areas, there are plenty of opportunities to
+                contribute effectively.
+            </p>
+            <p>
+                Focus areas: Timeline functionality, project management, performance,
+                bug fixes, and UI improvements outside the preview panel.
+            </p>
+            <p>
+                web开发基本上不用基础组件，都是找一个三方ui库，全套组件都包含。那是因为html的基础组件默认样式不适配手机风格。但uni-app体系不是这样，内置组件就是为手机优化的。
+            </p>
+            <p>
+                但内置组件只能满足基础需求，更多场景，需要扩展组件。扩展组件是基于内置组件的二次封装，从性能上来讲，扩展组件的性能略低于内置组件，所以开发者切勿抛弃内置组件，直接全套用三方UI组件库。
+            </p>
+            <p>
+                众多扩展组件如何选择？我们首先要搞清楚组件的分类。组件分2大类：1、vue组件（文件后缀为vue）；2、小程序自定义组件（文件后缀为wxml或其他小程序平台特有后缀名称）
+            </p>
+            <p>
+                同样是vue组件，only for
+                web的和全端的有什么区别？传统的vue组件，比如elementUI，都是only for
+                web的，里面有大量dom和window对象操作。但小程序和App是没有dom这些api的，自然无法跨端使用。想要跨端，其实也不难，做一套无dom的vue组件即可。官方的uni-ui即是如此。还有众多开发者在插件市场提交了更多这种类型的库。
+            </p>
+            <p>
+                DCloud官方出了一套扩展组件，即uni-ui这些扩展组件支持单个组件从插件市场下载，也支持npm引入uni
+                ui，当然更方便的是在HBuilderX新建项目时直接选择uni ui项目模板uni
+                ui有如下优势：
+            </p>
+            <p>
+                优化逻辑层和视图层的通信折损：非H5端的各个平台，包括App和各种小程序，其逻辑层和视图层是分离的，两层之间通信交互会有折损，导致诸如跟手滑动不流畅。uni
+                ui在底层会利用wxs等技术，把适当的js代码运行在视图层，减少通信折损，保证诸如swiperAction左滑菜单等跟手操作流畅顺滑
+            </p>
+            <p>
+                背景停止：很多ui组件是会一直动的，比如轮播图、跑马灯。即便这个窗体被新窗体挡住，它在背景层仍然在消耗着硬件资源。在Android的webview版本为chrome66以上，背景操作ui会引发很严重的性能问题，造成前台界面明显卡顿。而uni
+                ui的组件，会自动判断自己的显示状态，在组件不再可见时，不会再做动画消耗硬件资源。
+            </p>
+            <p>
+                背景停止：很多ui组件是会一直动的，比如轮播图、跑马灯。即便这个窗体被新窗体挡住，它在背景层仍然在消耗着硬件资源。在Android的webview版本为chrome66以上，背景操作ui会引发很严重的性能问题，造成前台界面明显卡顿。而uni
+                ui的组件，会自动判断自己的显示状态，在组件不再可见时，不会再做动画消耗硬件资源。
+            </p>
+            <p>
+                背景停止：很多ui组件是会一直动的，比如轮播图、跑马灯。即便这个窗体被新窗体挡住，它在背景层仍然在消耗着硬件资源。在Android的webview版本为chrome66以上，背景操作ui会引发很严重的性能问题，造成前台界面明显卡顿。而uni
+                ui的组件，会自动判断自己的显示状态，在组件不再可见时，不会再做动画消耗硬件资源。
+            </p>
+        </div>
+        <div class="player-control" id="playerControl">
+            <div class="player-header">
+                <span>语音播放控制</span>
+                <button id="exitBtn"
+                    style="background:#ff4d4f;color:#fff;padding:2px 8px;border:none;border-radius:6px;">退出</button>
+            </div>
+
+            <div class="player-buttons">
+                <button id="prevBtn">⏮️ 上一句</button>
+                <button id="playPauseBtn">⏸️</button>
+                <button id="nextBtn">下一句 ⏭️</button>
+            </div>
+
+            <div class="player-options">
+                <label for="rateSelect">语速：</label>
+                <input type="range" id="rateSelect" min="0.5" max="2" step="0.1" value="1">
+
+                <label for="voiceSelect">声音：</label>
+                <select id="voiceSelect"></select>
+            </div>
+        </div>
+    </div>
+    <script>
+        document.addEventListener("DOMContentLoaded", () => {
+            const box = document.querySelector(".box");
+            const paragraphs = box.querySelectorAll("p");
+            const audios = [];
+            const boxRect = box.getBoundingClientRect();
+
+            // 播放面板
+            const playerControl = document.getElementById("playerControl");
+            const prevBtn = document.getElementById("prevBtn");
+            const nextBtn = document.getElementById("nextBtn");
+            const playPauseBtn = document.getElementById("playPauseBtn");
+            const exitBtn = document.getElementById("exitBtn");
+            const rateSelect = document.getElementById("rateSelect");
+            const voiceSelect = document.getElementById("voiceSelect");
+
+            let voices = [];
+            let currentUtterance = null;
+            let currentIndex = null;
+            let isPaused = false;
+            let rate = 1;
+
+            // 创建 audio 按钮并放置
+            paragraphs.forEach((p, index) => {
+                const pRect = p.getBoundingClientRect();
+                const top = pRect.top - boxRect.top;
+                const left = -16;
+
+                const audio = document.createElement("div");
+                audio.classList.add("audio");
+                audio.dataset.index = index;
+                audio.style.top = `${top}px`;
+                audio.style.left = `${left}px`;
+                box.appendChild(audio);
+
+                audios.push(audio);
+            });
+
+            function loadVoices() {
+                voices = speechSynthesis.getVoices();
+                voiceSelect.innerHTML = "";
+                voices.forEach((voice, i) => {
+                    const option = document.createElement("option");
+                    option.value = i;
+                    option.textContent = `${voice.name} (${voice.lang})`;
+                    voiceSelect.appendChild(option);
+                });
+            }
+            loadVoices();
+            speechSynthesis.onvoiceschanged = loadVoices;
+
+            function playParagraph(index) {
+                if (index < 0 || index >= paragraphs.length) return;
+
+                speechSynthesis.cancel();
+                audios.forEach(a => a.classList.remove("active"));
+
+                currentIndex = index;
+                const text = paragraphs[index].innerText;
+
+                audios[index].classList.add("active");
+
+                const utterance = new SpeechSynthesisUtterance(text);
+                currentUtterance = utterance;
+                utterance.rate = rate;
+
+                const selectedVoice = voices[voiceSelect.value];
+                if (selectedVoice) utterance.voice = selectedVoice;
+
+                utterance.onend = () => {
+                    if (!isPaused) {
+                        audios[index].classList.remove("active");
+                        playParagraph(index + 1);
+                    }
+                };
+
+                speechSynthesis.speak(utterance);
+
+                playerControl.style.display = "block";
+                playPauseBtn.textContent = "⏸️"; // 播放时显示暂停图标
+                isPaused = false;
+            }
+
+            audios.forEach(audio => {
+                audio.addEventListener("click", () => {
+                    const index = parseInt(audio.dataset.index);
+                    playParagraph(index);
+                });
+            });
+
+            // 控制按钮逻辑
+            prevBtn.addEventListener("click", () => {
+                if (currentIndex !== null) {
+                    playParagraph(currentIndex - 1);
+                }
+            });
+
+            nextBtn.addEventListener("click", () => {
+                if (currentIndex !== null) {
+                    playParagraph(currentIndex + 1);
+                }
+            });
+
+            playPauseBtn.addEventListener("click", () => {
+                if (!currentUtterance) return;
+
+                if (isPaused) {
+                    playParagraph(currentIndex); // 重新开始当前段
+                    playPauseBtn.textContent = "⏸️"; // 切换为暂停按钮
+                    isPaused = false;
+                } else {
+                    speechSynthesis.cancel(); // 停止播放
+                    playPauseBtn.textContent = "▶️"; // 切换为播放按钮
+                    isPaused = true;
+                }
+            });
+
+            rateSelect.addEventListener("input", () => {
+                rate = parseFloat(rateSelect.value);
+                if (currentUtterance) {
+                    speechSynthesis.cancel();
+                    playParagraph(currentIndex);
+                }
+            });
+
+            voiceSelect.addEventListener("change", () => {
+                if (currentUtterance) {
+                    speechSynthesis.cancel();
+                    playParagraph(currentIndex);
+                }
+            });
+
+            exitBtn.addEventListener("click", () => {
+                speechSynthesis.cancel();
+                currentUtterance = null;
+                currentIndex = null;
+                audios.forEach(a => a.classList.remove("active"));
+                playerControl.style.display = "none";
+            });
+        });
+    </script>
+</body>
+
+</html>
